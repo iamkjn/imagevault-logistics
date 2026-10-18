@@ -1,0 +1,98 @@
+generator client {
+ provider = "prisma-client-js"
+}
+datasource db {
+ provider = "postgresql"
+ url = env("DATABASE_URL")
+ directUrl = env("DIRECT_URL")
+}
+enum Role {
+ ADMIN
+ USER
+}
+enum Status {
+ PENDING
+ ACTIVE
+ DISABLED
+}
+model User {
+ id String @id @default(cuid())
+ name String
+ email String @unique
+ image String?
+ role Role @default(USER)
+ status Status @default(PENDING)
+ encryptedRefreshToken String?
+ createdAt DateTime @default(now())
+ images Image[]
+ activities ActivityLog[]
+}
+model Category {
+ id String @id
+ name String @unique
+ images Image[]
+ folders DriveFolder[]
+}
+model DriveFolder {
+ id String @id @default(cuid())
+ driveFolderId String @unique
+ path String @unique
+ categoryId String?
+ category Category? @relation(fields: [categoryId], references: [id])
+ date String?
+ images Image[]
+}
+model Image {
+ id String @id @default(cuid())
+ driveFileId String @unique
+ fileName String
+ categoryId String
+ category Category @relation(fields: [categoryId], references: [id])
+ referenceId String
+ orderName String?
+ detectedReference String?
+ ocrConfidence Float?
+ captureDate String?
+ capturedAtLocal String?
+ captureOffset String?
+ captureSource String @default("UNKNOWN")
+ filedDate String?
+ notes String?
+ uploadedById String
+ uploadedBy User @relation(fields: [uploadedById], references: [id])
+ folderId String
+ folder DriveFolder @relation(fields: [folderId], references: [id])
+ mimeType String
+ sizeBytes Int
+ thumbnailUrl String?
+ uploadedAt DateTime @default(now())
+ deletedAt DateTime?
+ @@index([uploadedAt])
+ @@index([categoryId])
+ @@index([referenceId])
+ @@index([filedDate])
+ @@index([uploadedById])
+}
+model ActivityLog {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields: [userId], references: [id])
+ action String
+ entityId String
+ meta Json?
+ createdAt DateTime @default(now())
+ @@index([createdAt])
+}
+model RateLimit {
+ key String @id
+ count Int @default(1)
+ expiresAt DateTime
+}
+model UploadRequest {
+ payloadHash String
+ id String @id
+ userId String
+ imageId String?
+ driveFileId String @unique
+ createdAt DateTime @default(now())
+}
