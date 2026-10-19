@@ -1,8 +1,12 @@
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
+
+import { hasLiveWorkspaceConfig } from '@/lib/config';
+
 export async function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname;
   if (
+    (p === '/' && !hasLiveWorkspaceConfig()) ||
     p.startsWith('/ocr/') ||
     p === '/login' ||
     p === '/demo' ||

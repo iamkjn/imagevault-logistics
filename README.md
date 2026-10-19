@@ -4,6 +4,22 @@ A mobile-friendly warehouse photo workspace built with Next.js App Router, TypeS
 
 Capture parcels, pallets, damage, and other items; read order labels automatically; file gallery photos by their original capture date; review unsorted images; manage team access; and monitor uploads.
 
+## Fastest prototype hosting: one click, no setup
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fiamkjn%2Fimagevault-logistics)
+
+Use this option when you want to share and test the interface without operational overhead:
+
+1. Click **Deploy with Vercel** above and sign in to Vercel with GitHub.
+2. Accept the suggested project name and click **Deploy**. Do not add environment variables.
+3. Open the supplied `https://...vercel.app` URL. The root address automatically opens the interactive demo.
+
+That is the entire prototype deployment. Vercel installs and builds the public GitHub repository, supplies HTTPS, and assigns the address. No domain purchase, DNS, Google Cloud project, OAuth consent screen, database, storage configuration, migration, secret, or server maintenance is required.
+
+Prototype mode includes the responsive dashboard, 168 sample records, gallery and folder navigation, image preview, filters, theme, local EXIF/OCR analysis, camera/gallery selection, and simulated management actions. Demo changes reset when the page reloads. Selected images stay in the browser and are not uploaded. Persistent accounts, shared uploads, Google Drive storage, approval workflows, and real exports require the live setup described later.
+
+Every push to `main` triggers a new Vercel deployment after the Git repository is connected. Use Vercel's deployment history to inspect or roll back a release. There is no database to back up in prototype mode.
+
 ## Run the interactive demo
 
 Requires Node.js 22.17 or newer and npm.
