@@ -17,6 +17,110 @@ Open **http://127.0.0.1:3000/demo**. No credentials or database are required for
 
 For real accounts, follow [SETUP.md](docs/SETUP.md). Credentials are not included. The Google OAuth, live Drive, and PostgreSQL flows require deployment-environment integration testing before production use.
 
+## Connect Google Drive and run a real workspace
+
+ImageVault uses one administrator’s Google Drive as the organization’s central image vault. Staff sign in with Google and use the application, while uploads are stored through the designated vault owner. The app requests Google’s `drive.file` scope, which limits it to files and folders created or opened by ImageVault.
+
+### 1. Create the Google OAuth application
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create or select a project.
+2. Open **APIs & Services → Library** and enable **Google Drive API**.
+3. Open **Google Auth Platform** and configure the consent screen. Use **Internal** for an eligible Google Workspace organization, or **External** and add the intended users while the app is in testing.
+4. Add these scopes:
+   - `openid`
+   - `email`
+   - `profile`
+   - `https://www.googleapis.com/auth/drive.file`
+5. Create an OAuth client with application type **Web application**.
+6. Add the origin used by the application:
+   - Local: `http://localhost:3000`
+   - Optional numeric local origin: `http://127.0.0.1:3000`
+   - Production: `https://your-domain.example`
+7. Add matching redirect URIs:
+   - `http://localhost:3000/api/auth/callback/google`
+   - `http://127.0.0.1:3000/api/auth/callback/google`
+   - `https://your-domain.example/api/auth/callback/google`
+8. Copy the OAuth client ID and client secret. Store them only in local or deployment environment variables; never commit them to GitHub.
+
+### 2. Configure PostgreSQL and environment variables
+
+Create a PostgreSQL database locally or with a service such as Supabase. Copy the example environment file and generate two independent secrets:
+
+```sh
+cp .env.example .env
+openssl rand -base64 32
+openssl rand -base64 32
+```
+
+Complete `.env` with your real values:
+
+```dotenv
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true&connection_limit=1&schema=public"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres?schema=public"
+
+GOOGLE_CLIENT_ID="your-google-oauth-client-id"
+GOOGLE_CLIENT_SECRET="your-google-oauth-client-secret"
+
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="first-generated-secret"
+ENCRYPTION_KEY="second-generated-secret"
+
+ADMIN_EMAILS="admin@your-company.example"
+DRIVE_OWNER_EMAIL="admin@your-company.example"
+TIMEZONE="Europe/London"
+```
+
+`ENCRYPTION_KEY` must decode to exactly 32 bytes. `DRIVE_OWNER_EMAIL` should initially match the first address in `ADMIN_EMAILS`. This account owns the Drive vault and must remain an active administrator.
+
+For Supabase or another serverless PostgreSQL provider, use the transaction pooler for `DATABASE_URL` and a direct or session-pooler connection for `DIRECT_URL`. The backend database role must be allowed to access the application tables; database credentials are never sent to the browser.
+
+### 3. Install, migrate and start
+
+```sh
+npm ci
+npm run db:generate
+npm run db:migrate
+npm run dev
+```
+
+Open the exact origin configured in `NEXTAUTH_URL`. Do not switch between `localhost` and `127.0.0.1` during OAuth setup unless both origins and callback URLs are configured.
+
+### 4. Connect the central Drive owner
+
+1. Sign in to ImageVault first as `DRIVE_OWNER_EMAIL`.
+2. Accept the requested Google profile and `drive.file` permissions.
+3. ImageVault encrypts the returned refresh token with `ENCRYPTION_KEY`; the plaintext token is not stored.
+4. Upload a disposable test image. ImageVault creates its managed folder structure in the owner’s Drive on demand.
+5. Confirm the image appears under `ImageVault/<Category>/<Year>/<Date>` or under `ImageVault/Misc` when it needs sorting.
+6. Sign in as a second user, approve that pending account from **Team members**, and verify that the user can upload but cannot access administrator operations.
+
+Google Drive links shown inside the app still follow Google Drive’s own sharing permissions. ImageVault does not automatically expose the owner’s Drive folders to staff; staff access their authorized records through the application.
+
+### 5. Deploy
+
+For Vercel or another Node.js host:
+
+1. Use Node.js 22.17 or newer.
+2. Set the install command to `npm ci` and the build command to `npm run build`.
+3. Add every value from `.env.example` to the host’s encrypted environment settings.
+4. Set `NEXTAUTH_URL` to the final HTTPS origin without a trailing slash.
+5. Add the final origin and `/api/auth/callback/google` URL to the Google OAuth client.
+6. Run `npm run db:migrate` from a trusted release environment before serving production traffic.
+7. Sign in as the Drive owner and complete the live checks in [TESTING.md](docs/TESTING.md).
+
+External Google OAuth applications left in **Testing** can receive refresh tokens that expire after seven days when Drive scopes are used. Configure the consent screen appropriately before relying on the vault in production. Back up PostgreSQL and protect the Drive owner account with strong authentication.
+
+### Common connection problems
+
+- **`redirect_uri_mismatch`:** the scheme, hostname, port and `/api/auth/callback/google` path must exactly match the redirect registered in Google Cloud.
+- **Sign-in is disabled:** verify `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DATABASE_URL`, `NEXTAUTH_URL` and `NEXTAUTH_SECRET`, then restart the server.
+- **Vault owner must connect:** sign in as `DRIVE_OWNER_EMAIL`; this account must also be an active administrator.
+- **Drive access expired:** sign out and sign in again as the Drive owner to grant consent again.
+- **Database migration fails:** check `DIRECT_URL`, TLS requirements and database-role ownership/permissions.
+- **A photo is placed in Misc:** the gallery image did not contain a reliable original capture date or order label. Review it in the admin gallery and move it into a date folder.
+
+The longer operational guide, including Supabase and Vercel details, is available in [docs/SETUP.md](docs/SETUP.md).
+
 ## Screenshots
 
 These are actual screenshots of the local demo, not screenshots of a connected production vault.
