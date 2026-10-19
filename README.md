@@ -17,6 +17,46 @@ Open **http://127.0.0.1:3000/demo**. No credentials or database are required for
 
 For real accounts, follow [SETUP.md](docs/SETUP.md). Credentials are not included. The Google OAuth, live Drive, and PostgreSQL flows require deployment-environment integration testing before production use.
 
+## Run without buying or registering a domain
+
+A custom domain is optional. Choose one of these setups:
+
+### Local use on one computer
+
+Use `http://localhost:3000` for the full application on the computer running ImageVault. Google permits HTTP OAuth callbacks for localhost during development.
+
+1. Register these exact values on the Google **Web application** OAuth client:
+   - Authorized JavaScript origin: `http://localhost:3000`
+   - Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+2. Set `NEXTAUTH_URL="http://localhost:3000"` in `.env`.
+3. Create a local or hosted PostgreSQL database, complete the other `.env` values, and run:
+
+   ```sh
+   npm ci
+   npm run db:generate
+   npm run db:migrate
+   npm run dev
+   ```
+
+4. Open `http://localhost:3000/login` in the same computer's normal browser.
+
+Keep the Google OAuth app in **Testing** and add each account under **Test users** while evaluating it. This setup does not need DNS, a purchased domain, or HTTPS. It is intended for development or use on that one computer; `localhost` on a phone means the phone itself, not the computer.
+
+### Online use with a free supplied address
+
+Vercel automatically assigns a URL such as `https://imagevault-logistics-yourname.vercel.app`, so a purchased domain is not required.
+
+1. Import this GitHub repository into Vercel and deploy it once.
+2. Copy the stable production URL from the Vercel project.
+3. Set `NEXTAUTH_URL` to that exact URL in Vercel.
+4. Register that URL as a Google OAuth authorized JavaScript origin.
+5. Register `https://YOUR-PROJECT.vercel.app/api/auth/callback/google` as the redirect URI.
+6. Redeploy after setting the environment variables, run the database migrations, then sign in as the Drive owner.
+
+Use the stable production URL for OAuth, rather than a per-commit preview URL that changes. An internet deployment is public at the network level unless deployment protection is configured, although ImageVault still requires Google sign-in and administrator approval. Google may require a public homepage, privacy policy, terms, verification, or a domain you control when an external OAuth app is moved beyond testing. Local testing with listed test users does not require purchasing a domain.
+
+Do not use a LAN address such as `http://192.168.1.20:3000` for the real Google sign-in flow. Google requires HTTPS for non-localhost web callbacks and rejects raw non-loopback IP callback hosts. A phone also needs a secure HTTPS context for dependable camera access. Use the supplied Vercel HTTPS address when staff need access from phones or other computers.
+
 ## Connect Google Drive and run a real workspace
 
 ImageVault uses one administrator’s Google Drive as the organization’s central image vault. Staff sign in with Google and use the application, while uploads are stored through the designated vault owner. The app requests Google’s `drive.file` scope, which limits it to files and folders created or opened by ImageVault.
@@ -73,6 +113,8 @@ TIMEZONE="Europe/London"
 `ENCRYPTION_KEY` must decode to exactly 32 bytes. `DRIVE_OWNER_EMAIL` should initially match the first address in `ADMIN_EMAILS`. This account owns the Drive vault and must remain an active administrator.
 
 For Supabase or another serverless PostgreSQL provider, use the transaction pooler for `DATABASE_URL` and a direct or session-pooler connection for `DIRECT_URL`. The backend database role must be allowed to access the application tables; database credentials are never sent to the browser.
+
+The quickest hosted option is Supabase: create a project, save its database password, open **Connect**, and copy both the transaction-pooler and direct/session-pooler Prisma URLs. The quickest local option is PostgreSQL 16 in Docker. Detailed commands, migration behavior, table descriptions, backups, restores, Prisma Studio, and common database fixes are in [DATABASE.md](docs/DATABASE.md).
 
 ### 3. Install, migrate and start
 

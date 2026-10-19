@@ -15,6 +15,8 @@ Put the first generated random value in `NEXTAUTH_SECRET`, and the second in `EN
 
 Use one consistent local origin. The development server binds to `127.0.0.1`; `http://localhost:3000` also normally resolves to it. Set `NEXTAUTH_URL` to the exact origin you browse during real sign-in. OAuth redirect URIs must match that origin. The `/demo` route works without any environment values.
 
+No purchased domain is required for local use. Register `http://localhost:3000` and `http://localhost:3000/api/auth/callback/google` on the OAuth client, then keep the app in Testing with the intended accounts listed as test users. For access from other computers or phones, use an HTTPS deployment URL. Vercel assigns a stable `*.vercel.app` production address automatically; use that exact address for `NEXTAUTH_URL`, the JavaScript origin, and the OAuth callback. Raw LAN IP addresses are not suitable for Google web OAuth callbacks, and mobile camera access should use HTTPS.
+
 ## 2. Google Cloud project and OAuth
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project for ImageVault Logistics.
@@ -43,6 +45,8 @@ External applications in Google’s Testing state can receive refresh tokens tha
 Official references: [Google web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [token expiration conditions](https://developers.google.com/identity/protocols/oauth2/), [Drive folder creation](https://developers.google.com/workspace/drive/api/guides/folder), [Drive uploads](https://developers.google.com/workspace/drive/api/guides/manage-uploads), [NextAuth Google provider](https://next-auth.js.org/providers/google).
 
 ## 3. PostgreSQL / Supabase
+
+For a complete walkthrough covering Supabase, local Docker PostgreSQL, migrations, Prisma Studio, table purposes, account state, backups, restores, cleanup, and troubleshooting, see [DATABASE.md](DATABASE.md).
 
 1. Create a Supabase project or use an existing PostgreSQL server.
 2. Obtain the database connection strings through the project’s **Connect** panel. Use a dedicated backend database role following [Supabase’s Prisma guide](https://supabase.com/docs/guides/database/prisma). The runtime role must own these tables or have the deliberate backend RLS-bypass privileges; it is never exposed to the browser.
