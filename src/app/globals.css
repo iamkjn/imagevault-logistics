@@ -535,6 +535,36 @@ strong {
 .kpi {
   padding: 18px 17px;
 }
+.dashboard-card-link {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.dashboard-card-link:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 10px 28px rgb(28 33 58 / 9%);
+}
+.dashboard-card-link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 2px;
+}
+.kpi-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 10px;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 650;
+}
 .kpi > div {
   display: flex;
   justify-content: space-between;
@@ -2409,13 +2439,6 @@ th:last-child {
     transition: none !important;
   }
 }
-.smart-review {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 20px;
-  border-top: 1px solid var(--border);
-  padding: 22px 0;
-}
 .review-photo {
   width: 140px;
   height: 170px;
@@ -2423,18 +2446,97 @@ th:last-child {
   background: var(--bg);
   border-radius: 10px;
 }
-.smart-review-fields {
+.review-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 14px;
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
+}
+.review-tile {
   min-width: 0;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
 }
-.smart-review-fields > strong {
+.review-tile-photo {
+  width: 100%;
+  aspect-ratio: 1 / 1;
   display: block;
-  font-size: 12px;
+  object-fit: cover;
+  background: var(--bg);
+}
+.review-tile-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+}
+.review-tile-actions button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid rgb(255 255 255 / 55%);
+  background: rgb(20 24 38 / 76%);
+  color: white;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.review-tile-actions button:hover,
+.review-tile-actions button:focus-visible {
+  background: var(--primary);
+}
+.review-tile-actions button.delete:hover,
+.review-tile-actions button.delete:focus-visible {
+  background: #c55454;
+}
+.review-tile-meta {
+  padding: 11px;
+}
+.review-tile-meta strong,
+.review-tile-meta small,
+.review-tile-meta span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-tile-meta strong {
+  font-size: 10px;
+}
+.review-tile-meta small,
+.review-tile-meta span {
+  margin-top: 5px;
+  font-size: 9px;
+}
+.review-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+.review-pagination > span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.review-edit-dialog {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+.review-edit-dialog .review-photo {
+  width: 100%;
+  height: min(260px, 30vh);
+}
+.review-edit-dialog > strong {
   overflow-wrap: anywhere;
-}
-.smart-review-fields > small {
-  display: block;
-  margin-top: 8px;
-  line-height: 1.5;
+  font-size: 11px;
 }
 .analysis-note {
   font-size: 11px;
@@ -2476,12 +2578,12 @@ th:last-child {
   width: 100%;
 }
 @media (max-width: 600px) {
-  .smart-review {
-    grid-template-columns: 1fr;
+  .review-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
-  .review-photo {
-    width: 100%;
-    height: 190px;
+  .review-pagination {
+    justify-content: space-between;
   }
 }
 @media (max-width: 520px) {

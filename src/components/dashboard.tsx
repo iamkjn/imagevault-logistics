@@ -42,6 +42,12 @@ export function dayString(d: Date, timezone = 'Europe/London') {
     day: '2-digit',
   }).format(d);
 }
+function startOfCurrentWeek(today: string) {
+  const date = new Date(`${today}T12:00:00Z`);
+  const daysSinceMonday = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+  return date.toISOString().slice(0, 10);
+}
 export function RangePicker({
   range,
   setRange,
@@ -127,6 +133,51 @@ export function Dashboard({
           'CSV export is available after connecting your live workspace.',
         )
       : location.assign('/api/export/csv?' + params);
+  const today = dayString(new Date(), timezone);
+  const summaryCards = [
+    {
+      label: 'Total images',
+      value: data?.total,
+      icon: Images,
+      sub: 'All-time image records',
+      tone: 'indigo',
+      open: () => go('gallery'),
+    },
+    {
+      label: 'Uploaded today',
+      value: data?.today,
+      icon: Upload,
+      sub: 'Captured since midnight',
+      tone: 'blue',
+      open: () => go('gallery', { start: today, end: today }),
+    },
+    {
+      label: 'This week',
+      value: data?.week,
+      icon: CalendarDays,
+      sub: 'Since Monday',
+      tone: 'violet',
+      open: () =>
+        go('gallery', { start: startOfCurrentWeek(today), end: today }),
+    },
+    {
+      label: 'This month',
+      value: data?.month,
+      icon: Layers,
+      sub: 'Current calendar month',
+      tone: 'amber',
+      open: () =>
+        go('gallery', { start: `${today.slice(0, 7)}-01`, end: today }),
+    },
+    {
+      label: 'Active members',
+      value: data?.activeUsers,
+      icon: Users,
+      sub: 'Approved team members',
+      tone: 'green',
+      open: () => go('users'),
+    },
+  ];
   return (
     <>
       <div className="page-heading">
@@ -160,56 +211,31 @@ export function Dashboard({
       ) : (
         <>
           <div className="kpi-grid">
-            {[
-              {
-                label: 'Total images',
-                value: data?.total,
-                icon: Images,
-                sub: 'All-time image records',
-                tone: 'indigo',
-              },
-              {
-                label: 'Uploaded today',
-                value: data?.today,
-                icon: Upload,
-                sub: 'Captured since midnight',
-                tone: 'blue',
-              },
-              {
-                label: 'This week',
-                value: data?.week,
-                icon: CalendarDays,
-                sub: 'Since Monday',
-                tone: 'violet',
-              },
-              {
-                label: 'This month',
-                value: data?.month,
-                icon: Layers,
-                sub: 'Current calendar month',
-                tone: 'amber',
-              },
-              {
-                label: 'Active members',
-                value: data?.activeUsers,
-                icon: Users,
-                sub: 'Approved team members',
-                tone: 'green',
-              },
-            ].map(({ label, value, icon: Icon, sub, tone }) => (
-              <article className="card kpi" key={label}>
-                <div>
-                  <span>{label}</span>
-                  <span className={`kpi-icon ${tone}`}>
-                    <Icon size={18} />
+            {summaryCards.map(
+              ({ label, value, icon: Icon, sub, tone, open }) => (
+                <button
+                  type="button"
+                  className="card kpi dashboard-card-link"
+                  key={label}
+                  onClick={open}
+                  aria-label={`Open ${label.toLowerCase()}`}
+                >
+                  <div>
+                    <span>{label}</span>
+                    <span className={`kpi-icon ${tone}`}>
+                      <Icon size={18} />
+                    </span>
+                  </div>
+                  <strong className={loading ? 'skeleton' : ''}>
+                    {value?.toLocaleString() ?? '—'}
+                  </strong>
+                  <small>{sub}</small>
+                  <span className="kpi-open" aria-hidden="true">
+                    View <ArrowUpRight size={13} />
                   </span>
-                </div>
-                <strong className={loading ? 'skeleton' : ''}>
-                  {value?.toLocaleString() ?? '—'}
-                </strong>
-                <small>{sub}</small>
-              </article>
-            ))}
+                </button>
+              ),
+            )}
           </div>
           <div className="charts-grid">
             <section className="card chart-card">

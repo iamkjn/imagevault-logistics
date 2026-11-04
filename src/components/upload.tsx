@@ -14,9 +14,18 @@ import {
   WifiOff,
   ShieldCheck,
   FolderTree,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from './ui/dialog';
 import {
   listQueue,
   saveQueue,
@@ -31,7 +40,13 @@ const cats = [
   { name: 'Damaged', icon: CircleAlert, description: 'Damage & exceptions' },
   { name: 'Other', icon: Box, description: 'Everything else' },
 ];
-function PhotoPreview({ file }: { file: Blob }) {
+function PhotoPreview({
+  file,
+  className = 'review-photo',
+}: {
+  file: Blob;
+  className?: string;
+}) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     const next = URL.createObjectURL(file);
@@ -39,11 +54,7 @@ function PhotoPreview({ file }: { file: Blob }) {
     return () => URL.revokeObjectURL(next);
   }, [file]);
   return url ? (
-    <img
-      className="review-photo"
-      src={url}
-      alt="Photo awaiting upload review"
-    />
+    <img className={className} src={url} alt="Photo awaiting upload review" />
   ) : null;
 }
 export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
@@ -56,6 +67,8 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
     [preparing, setPreparing] = useState(false),
     [analysisStatus, setAnalysisStatus] = useState(''),
     [drag, setDrag] = useState(false),
+    [editingId, setEditingId] = useState<string | null>(null),
+    [reviewPage, setReviewPage] = useState(1),
     [progress, setProgress] = useState<Record<string, number>>({}),
     [completed, setCompleted] = useState(0);
   const picker = useRef<HTMLInputElement>(null),
@@ -252,6 +265,19 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
     setAnalysisStatus('');
   };
   const reviews = queue.filter((i) => i.status === 'review');
+  const reviewPageSize = 24;
+  const reviewPageCount = Math.max(
+    1,
+    Math.ceil(reviews.length / reviewPageSize),
+  );
+  const visibleReviews = reviews.slice(
+    (reviewPage - 1) * reviewPageSize,
+    reviewPage * reviewPageSize,
+  );
+  const editing = reviews.find((item) => item.id === editingId);
+  useEffect(() => {
+    if (reviewPage > reviewPageCount) setReviewPage(reviewPageCount);
+  }, [reviewPage, reviewPageCount]);
   const approve = async () => {
     if (demo) {
       toast.info(
@@ -446,101 +472,139 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                   </p>
                 </div>
               </div>
-              {reviews.map((item) => (
-                <article className="smart-review" key={item.id}>
-                  <PhotoPreview file={item.file} />
-                  <div className="smart-review-fields">
-                    <strong>{item.name}</strong>
-                    <small>
-                      Fast upload · order OCR paused ·{' '}
-                      {item.captureSource === 'EXIF'
-                        ? 'Original photo metadata'
-                        : item.captureSource === 'FILENAME'
-                          ? 'Date detected from file name'
-                          : item.captureSource === 'FILE_TIMESTAMP'
-                            ? 'Estimated from gallery file date'
-                            : item.captureSource === 'CAMERA'
-                              ? 'Camera capture on this device'
-                              : 'No original capture metadata'}
-                    </small>
-                    {item.analysisNote && (
-                      <p className="analysis-note">{item.analysisNote}</p>
-                    )}
-                    <label className="field-label">
-                      Order name <small>Optional</small>
-                      <input
-                        maxLength={120}
-                        value={item.orderName || ''}
-                        placeholder="Optional · add later if needed"
-                        onChange={(e) =>
-                          void save({ ...item, orderName: e.target.value })
-                        }
-                      />
-                    </label>
-                    <label className="field-label">
-                      Order / reference ID <small>Optional</small>
-                      <input
-                        maxLength={120}
-                        value={item.referenceId}
-                        placeholder="Optional · add later if needed"
-                        onChange={(e) =>
-                          void save({ ...item, referenceId: e.target.value })
-                        }
-                      />
-                    </label>
-                    <label className="field-label">
-                      Folder date{' '}
-                      <small>
-                        {item.filedDate &&
-                        item.captureDate &&
-                        item.filedDate !== item.captureDate
-                          ? `Batch date: ${item.filedDate}`
-                          : item.captureDate
-                            ? item.captureSource === 'FILE_TIMESTAMP'
-                              ? `Estimated: ${item.captureDate} · verify only if this file was copied or edited`
-                              : item.captureSource === 'FILENAME'
-                                ? `Detected from name: ${item.captureDate}`
-                                : item.captureSource === 'CAMERA'
-                                  ? `Taken today: ${item.captureDate}`
-                                  : `Original: ${item.captureDate}`
-                            : 'No date detected · choose a date or leave in Misc'}
-                      </small>
-                      <input
-                        type="date"
-                        value={item.filedDate || ''}
-                        min="1900-01-01"
-                        max="2199-12-31"
-                        onChange={(e) =>
-                          void save({
-                            ...item,
-                            filedDate: e.target.value || null,
-                          })
-                        }
-                      />
-                    </label>
-                    <p className="filing-destination">
-                      <FolderTree size={14} />
-                      {item.filedDate
-                        ? `${item.category} / ${item.filedDate.slice(0, 4)} / ${item.filedDate}`
-                        : 'Misc · admin sorting required'}
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void remove(item.id)}
-                    >
-                      <Trash2 size={14} />
-                      Remove photo
-                    </Button>
-                  </div>
-                </article>
-              ))}
+              <div className="review-gallery">
+                {visibleReviews.map((item) => (
+                  <article className="review-tile" key={item.id}>
+                    <PhotoPreview
+                      file={item.file}
+                      className="review-tile-photo"
+                    />
+                    <div className="review-tile-actions">
+                      <button
+                        type="button"
+                        aria-label={`Edit ${item.name}`}
+                        title="Edit details"
+                        onClick={() => setEditingId(item.id)}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="delete"
+                        aria-label={`Delete ${item.name}`}
+                        title="Delete image"
+                        onClick={() => void remove(item.id)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <div className="review-tile-meta">
+                      <strong>
+                        {item.referenceId || item.orderName || item.name}
+                      </strong>
+                      <small>{item.category}</small>
+                      <span className={item.filedDate ? '' : 'misc-label'}>
+                        {item.filedDate || 'Misc · no date'}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {reviewPageCount > 1 && (
+                <div className="review-pagination">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={reviewPage === 1}
+                    onClick={() => setReviewPage((page) => page - 1)}
+                  >
+                    <ChevronLeft size={15} /> Previous
+                  </Button>
+                  <span>
+                    Page {reviewPage} of {reviewPageCount} · {reviews.length}{' '}
+                    images
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={reviewPage === reviewPageCount}
+                    onClick={() => setReviewPage((page) => page + 1)}
+                  >
+                    Next <ChevronRight size={15} />
+                  </Button>
+                </div>
+              )}
               <Button disabled={preparing} onClick={approve}>
                 <UploadCloud size={16} />
                 {demo
                   ? 'Connect workspace to upload'
                   : `Upload ${reviews.length} reviewed photo${reviews.length === 1 ? '' : 's'}`}
               </Button>
+              <Dialog
+                open={Boolean(editing)}
+                onOpenChange={(open) => !open && setEditingId(null)}
+              >
+                <DialogContent>
+                  <DialogTitle>Edit image details</DialogTitle>
+                  <DialogDescription>
+                    Change only what is needed. All fields except the folder
+                    date are optional.
+                  </DialogDescription>
+                  {editing && (
+                    <div className="review-edit-dialog">
+                      <PhotoPreview file={editing.file} />
+                      <strong>{editing.name}</strong>
+                      <label className="field-label">
+                        Order name <small>Optional</small>
+                        <input
+                          maxLength={120}
+                          value={editing.orderName || ''}
+                          placeholder="Optional · add later if needed"
+                          onChange={(e) =>
+                            void save({ ...editing, orderName: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label className="field-label">
+                        Order / reference ID <small>Optional</small>
+                        <input
+                          maxLength={120}
+                          value={editing.referenceId}
+                          placeholder="Optional · add later if needed"
+                          onChange={(e) =>
+                            void save({
+                              ...editing,
+                              referenceId: e.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="field-label">
+                        Folder date
+                        <input
+                          type="date"
+                          value={editing.filedDate || ''}
+                          min="1900-01-01"
+                          max="2199-12-31"
+                          onChange={(e) =>
+                            void save({
+                              ...editing,
+                              filedDate: e.target.value || null,
+                            })
+                          }
+                        />
+                      </label>
+                      <p className="filing-destination">
+                        <FolderTree size={14} />
+                        {editing.filedDate
+                          ? `${editing.category} / ${editing.filedDate.slice(0, 4)} / ${editing.filedDate}`
+                          : 'Misc · admin sorting required'}
+                      </p>
+                      <Button onClick={() => setEditingId(null)}>Done</Button>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </section>
           )}
         </div>
