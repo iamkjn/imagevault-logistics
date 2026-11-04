@@ -14,7 +14,7 @@ export type QueuedImage = {
   captureDate?: string | null;
   capturedAtLocal?: string | null;
   captureOffset?: string | null;
-  captureSource?: 'EXIF' | 'CAMERA' | 'UNKNOWN';
+  captureSource?: 'EXIF' | 'FILENAME' | 'FILE_TIMESTAMP' | 'CAMERA' | 'UNKNOWN';
   filedDate?: string | null;
   analysisNote?: string;
   error?: string;

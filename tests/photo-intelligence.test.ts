@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import exifr from 'exifr';
 import {
   captureFromTags,
+  captureFromFilename,
+  captureFromFileTimestamp,
   cameraCapture,
   detectOrder,
   validCalendarDate,
@@ -28,13 +30,49 @@ describe('original capture dates', () => {
       'ImageVault/Parcels/2024/2024-12-31',
     );
   });
-  it('does not mistake modification/creation time for capture time', () => {
+  it('does not mistake a generic modification time for capture time', () => {
     expect(
       captureFromTags({
         ModifyDate: '2026:10:18 12:00:00',
-        CreateDate: '2026:10:18 12:00:00',
       }).captureDate,
     ).toBeNull();
+  });
+  it('uses HEIC creation metadata when the original exposure tag is absent', () => {
+    expect(
+      captureFromTags({ CreateDate: '2025:08:07 09:08:07' }),
+    ).toMatchObject({
+      captureDate: '2025-08-07',
+      capturedAtLocal: '2025-08-07T09:08:07',
+      captureSource: 'EXIF',
+    });
+  });
+  it('reads common camera and WhatsApp dates from filenames', () => {
+    expect(captureFromFilename('IMG_20250504_142530.jpg')).toMatchObject({
+      captureDate: '2025-05-04',
+      capturedAtLocal: '2025-05-04T14:25:30',
+      captureSource: 'FILENAME',
+    });
+    expect(captureFromFilename('IMG-20240123-WA0001.jpg')).toMatchObject({
+      captureDate: '2024-01-23',
+      captureSource: 'FILENAME',
+    });
+    expect(
+      captureFromFilename('WhatsApp Image 2026-11-04 at 19.53.53 (6).jpeg'),
+    ).toMatchObject({
+      captureDate: '2026-11-04',
+      capturedAtLocal: '2026-11-04T19:53:53',
+      captureSource: 'FILENAME',
+    });
+  });
+  it('uses a plausible gallery timestamp as an explicitly estimated fallback', () => {
+    const value = new Date(2025, 3, 2, 11, 12, 13);
+    expect(
+      captureFromFileTimestamp(value.getTime(), new Date(2026, 0, 1)),
+    ).toMatchObject({
+      captureDate: '2025-04-02',
+      capturedAtLocal: '2025-04-02T11:12:13',
+      captureSource: 'FILE_TIMESTAMP',
+    });
   });
   it('keeps images without metadata unsorted', async () => {
     const tags = await exifr.parse(
@@ -68,6 +106,18 @@ describe('original capture dates', () => {
   });
 });
 describe('order detection', () => {
+  it('prioritizes a compound customer reference', () => {
+    expect(
+      detectOrder(
+        'Buyer Order No: N73003324\nCustomer Ref:\n24690 / N73003324',
+        91,
+      ),
+    ).toMatchObject({
+      referenceId: '24690/N73003324',
+      candidates: ['24690/N73003324'],
+      needsReview: false,
+    });
+  });
   it('extracts a named order and labeled reference', () => {
     expect(
       detectOrder('Order ID: ORD-10482\nOrder Name: Blue Storage Boxes', 94),

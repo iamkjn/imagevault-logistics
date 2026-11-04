@@ -50,6 +50,7 @@ function PhotoPreview({ file }: { file: Blob }) {
 export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
   const [category, setCategory] = useState('Parcels'),
     [reference, setReference] = useState(''),
+    [batchDate, setBatchDate] = useState(''),
     [notes, setNotes] = useState(''),
     [queue, setQueue] = useState<QueuedImage[]>([]),
     [online, setOnline] = useState(true),
@@ -236,13 +237,16 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
             analysisNote =
               detected.candidates.length > 1
                 ? `Multiple references found: ${detected.candidates.join(', ')}. Choose the correct one.`
-                : 'No single reliable order reference found. Enter it below, or keep this image in Misc.';
+                : 'No single reliable order reference found. You can leave it blank and continue.';
         } catch {
           analysisNote =
-            'Automatic label reading is unavailable. Enter the order details manually, or keep this image in Misc.';
+            'Automatic label reading is unavailable. You can leave the order details blank and continue.';
         }
         const referenceId = reference.trim() || detected.referenceId;
-        const known = Boolean(referenceId || detected.orderName);
+        const filedDate =
+          source === 'camera'
+            ? capture.captureDate
+            : batchDate || capture.captureDate;
         await save({
           id: crypto.randomUUID(),
           userId: user.id,
@@ -254,7 +258,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
           detectedReference: detected.referenceId,
           ocrConfidence: detected.confidence,
           ...capture,
-          filedDate: known ? capture.captureDate : null,
+          filedDate,
           notes,
           status: 'review',
           createdAt: Date.now(),
@@ -279,10 +283,6 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
       await saveQueue({
         ...item,
         status: 'queued',
-        filedDate:
-          item.referenceId.trim() || item.orderName?.trim()
-            ? item.filedDate
-            : null,
       });
     await refresh();
   };
@@ -357,6 +357,21 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                 <p>Order names and references are detected automatically.</p>
               </div>
             </div>
+            <label className="field-label">
+              Batch folder date <small>Optional · gallery uploads only</small>
+              <input
+                type="date"
+                min="1900-01-01"
+                max="2199-12-31"
+                value={batchDate}
+                onChange={(e) => setBatchDate(e.target.value)}
+              />
+              <small>
+                Pick once to file every selected gallery image under this date.
+                Leave blank to detect each image automatically. Camera photos
+                always use today.
+              </small>
+            </label>
             <label className="field-label">
               Reference override <small>Optional · applies to this batch</small>
               <input
@@ -449,8 +464,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                 <div>
                   <h2>Review detected details</h2>
                   <p>
-                    Check every label before uploading. Unsorted images stay in
-                    Misc.
+                    Upload now, or correct only the details that need attention.
                   </p>
                 </div>
               </div>
@@ -463,15 +477,19 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                       Label recognition: {item.ocrConfidence || 0}% ·{' '}
                       {item.captureSource === 'EXIF'
                         ? 'Original photo metadata'
-                        : item.captureSource === 'CAMERA'
-                          ? 'Camera capture on this device'
-                          : 'No original capture metadata'}
+                        : item.captureSource === 'FILENAME'
+                          ? 'Date detected from file name'
+                          : item.captureSource === 'FILE_TIMESTAMP'
+                            ? 'Estimated from gallery file date'
+                            : item.captureSource === 'CAMERA'
+                              ? 'Camera capture on this device'
+                              : 'No original capture metadata'}
                     </small>
                     {item.analysisNote && (
                       <p className="analysis-note">{item.analysisNote}</p>
                     )}
                     <label className="field-label">
-                      Order name
+                      Order name <small>Optional</small>
                       <input
                         maxLength={120}
                         value={item.orderName || ''}
@@ -482,7 +500,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                       />
                     </label>
                     <label className="field-label">
-                      Order / reference ID
+                      Order / reference ID <small>Optional</small>
                       <input
                         maxLength={120}
                         value={item.referenceId}
@@ -495,9 +513,19 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                     <label className="field-label">
                       Folder date{' '}
                       <small>
-                        {item.captureDate
-                          ? `Original: ${item.captureDate}`
-                          : 'No EXIF date · choose a date or leave in Misc'}
+                        {item.filedDate &&
+                        item.captureDate &&
+                        item.filedDate !== item.captureDate
+                          ? `Batch date: ${item.filedDate}`
+                          : item.captureDate
+                            ? item.captureSource === 'FILE_TIMESTAMP'
+                              ? `Estimated: ${item.captureDate} · verify only if this file was copied or edited`
+                              : item.captureSource === 'FILENAME'
+                                ? `Detected from name: ${item.captureDate}`
+                                : item.captureSource === 'CAMERA'
+                                  ? `Taken today: ${item.captureDate}`
+                                  : `Original: ${item.captureDate}`
+                            : 'No date detected · choose a date or leave in Misc'}
                       </small>
                       <input
                         type="date"
@@ -514,8 +542,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                     </label>
                     <p className="filing-destination">
                       <FolderTree size={14} />
-                      {item.filedDate &&
-                      (item.referenceId.trim() || item.orderName?.trim())
+                      {item.filedDate
                         ? `${item.category} / ${item.filedDate.slice(0, 4)} / ${item.filedDate}`
                         : 'Misc · admin sorting required'}
                     </p>
@@ -567,7 +594,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                       {item.orderName || item.referenceId || item.name}
                     </strong>
                     <small>
-                      {item.filedDate && (item.referenceId || item.orderName)
+                      {item.filedDate
                         ? `${item.category} · ${item.filedDate}`
                         : 'Misc · needs sorting'}
                     </small>
@@ -621,8 +648,8 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
             <FolderTree size={22} />
             <h3>The day it was taken.</h3>
             <p>
-              Gallery photos use their original EXIF capture date, not the date
-              they were downloaded or uploaded.
+              Choose one date for a gallery batch, or leave it blank for
+              automatic date detection. Camera photos use today.
             </p>
             <code>
               ImageVault / Category / Year / Date
@@ -634,10 +661,9 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
               Label reading happens on this device.
             </p>
             <small>
-              Missing or ambiguous details? Keep the image in Misc. Admins can
-              correct the order and move it into any date folder. Camera photos
-              without EXIF use the current device capture date. Gallery photos
-              never fall back to file modification time.
+              Order details are optional. Any image with a folder date is filed
+              there; only images with no date go to Misc for an administrator to
+              sort.
             </small>
           </section>
         </aside>

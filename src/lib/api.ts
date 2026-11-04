@@ -159,7 +159,13 @@ export async function handle(req: NextRequest, path: string[]) {
             z.string().regex(/^(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/),
             z.literal(''),
           ]),
-          captureSource: z.enum(['EXIF', 'CAMERA', 'UNKNOWN']),
+          captureSource: z.enum([
+            'EXIF',
+            'FILENAME',
+            'FILE_TIMESTAMP',
+            'CAMERA',
+            'UNKNOWN',
+          ]),
           notes: z.string().max(2000).default(''),
           uploaderId: z.string().min(1),
           requestId: z.uuid(),
@@ -206,8 +212,9 @@ export async function handle(req: NextRequest, path: string[]) {
           400,
           'Unknown capture source cannot claim an original date.',
         );
-      const filedDate =
-        metadata.referenceId || metadata.orderName ? metadata.filedDate : null;
+      // Folder placement depends on the chosen/detected date. Order details are
+      // useful search metadata, but are not a reason to send a dated photo to Misc.
+      const filedDate = metadata.filedDate;
       const file = form.get('file');
       if (
         !(file instanceof File) ||

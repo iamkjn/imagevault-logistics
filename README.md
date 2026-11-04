@@ -175,7 +175,7 @@ External Google OAuth applications left in **Testing** can receive refresh token
 - **Vault owner must connect:** sign in as `DRIVE_OWNER_EMAIL`; this account must also be an active administrator.
 - **Drive access expired:** sign out and sign in again as the Drive owner to grant consent again.
 - **Database migration fails:** check `DIRECT_URL`, TLS requirements and database-role ownership/permissions.
-- **A photo is placed in Misc:** the gallery image did not contain a reliable original capture date or order label. Review it in the admin gallery and move it into a date folder.
+- **A photo is placed in Misc:** no usable folder date was selected or detected. Review it in the admin gallery and move it into a date folder. Missing order details alone do not send an image to Misc.
 
 The longer operational guide, including Supabase and Vercel details, is available in [docs/SETUP.md](docs/SETUP.md).
 
@@ -207,10 +207,10 @@ These are actual screenshots of the local demo, not screenshots of a connected p
 
 1. Sign in with Google. Read the access explanation before consenting.
 2. Wait for an administrator to approve your account. Use **Check approval status** to refresh.
-3. Open **Upload**, choose a category, optionally enter an order/reference hint, and add any notes.
-4. Choose one or more images from the gallery, drag images onto the drop zone, or use **Take a photo** on mobile. Original files may be JPG, PNG, WebP, HEIC/HEIF and up to 15 MB each.
-5. ImageVault reads EXIF capture metadata before optimization and runs browser-local OCR to suggest the order name and reference. Review every suggestion. Gallery photos with a reliable original date are filed under that date; camera photos use the capture time from the current camera action.
-6. Photos without a reliable date or usable order details are filed in **Misc** for an administrator to sort. ImageVault converts accepted images to JPEG, scales them to at most 1920 pixels, removes original metadata, and compresses to under 3 MB for transport. Unsupported HEIC variants show an error; export those to JPEG on your device.
+3. Open **Upload**, choose a category, and optionally choose one **Batch folder date** for all gallery images. Leave it blank to detect each image date automatically. Order/reference hints and notes are optional.
+4. Choose one or more images from the gallery, drag images onto the drop zone, or use **Take a photo** on mobile. Camera photos automatically use the current device date. Original files may be JPG, PNG, WebP, HEIC/HEIF and up to 15 MB each.
+5. ImageVault reads EXIF capture metadata before optimization and runs browser-local OCR to suggest the order name and customer reference. The review screen is for quick corrections only; empty order details do not block upload.
+6. Only photos without a selected or detected folder date are filed in **Misc** for an administrator to sort. ImageVault converts accepted images to JPEG, scales them to at most 1920 pixels, removes original metadata, and compresses to under 3 MB for transport. Unsupported HEIC variants show an error; export those to JPEG on your device.
 7. Watch per-image upload progress. Failed items have a **Retry** button. Each queue item retains its idempotency ID.
 8. Open **My uploads** to browse your history and filter by reference, category, upload date, folder date, or folder status. Preview metadata and download images you uploaded.
 
@@ -240,7 +240,7 @@ ImageVault/
         PARCELS_Blue_Storage_Boxes_AWB-10482_142530_Alex_Morgan.jpg
 ```
 
-Gallery images use trustworthy EXIF `DateTimeOriginal` metadata for the proposed folder date. Direct camera captures use the time of the camera action. ImageVault does not treat file modification time as a capture date. If no reliable date exists, the image goes to `ImageVault/Misc`. The server validates all client suggestions and stores the capture source, local timestamp and offset for review. A retry uses the originally reserved server timestamp. Drive IDs, not names, identify images, so same-second filenames do not overwrite one another.
+Gallery images use the optional batch date first, then EXIF capture metadata, a recognizable camera/WhatsApp filename, and finally the gallery file timestamp as an estimated fallback. Direct camera captures always use the date of the current camera action. If no usable date exists, the image goes to `ImageVault/Misc`; missing order details alone do not affect folder placement. The server validates all client suggestions and stores the capture source, local timestamp and offset for review. A retry uses the originally reserved server timestamp. Drive IDs, not names, identify images, so same-second filenames do not overwrite one another.
 
 Staff can access their own files through the authenticated app. Google Drive links require separate Google Drive permissions; the app does not automatically share the owner’s Drive with staff. Admins see all app records. Do not manually rename, move, or trash vault folders outside the app without reconciling metadata.
 
