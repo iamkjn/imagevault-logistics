@@ -14,7 +14,6 @@ import {
   WifiOff,
   ShieldCheck,
   FolderTree,
-  ScanText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -24,7 +23,7 @@ import {
   deleteQueue,
   type QueuedImage,
 } from '@/lib/queue';
-import { readCapture, recognizeOrder } from '@/lib/photo-analysis';
+import { readCapture } from '@/lib/photo-analysis';
 import type { Viewer } from '@/lib/client';
 const cats = [
   { name: 'Parcels', icon: Package, description: 'Packages & deliveries' },
@@ -222,27 +221,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
           throw new Error(
             'The image could not be compressed enough. Choose a smaller file.',
           );
-        setAnalysisStatus(`Detecting order label · ${original.name}`);
-        let detected = {
-          referenceId: '',
-          orderName: '',
-          confidence: 0,
-          candidates: [] as string[],
-          needsReview: true,
-        };
-        let analysisNote = '';
-        try {
-          detected = await recognizeOrder(compressed, setAnalysisStatus);
-          if (detected.needsReview)
-            analysisNote =
-              detected.candidates.length > 1
-                ? `Multiple references found: ${detected.candidates.join(', ')}. Choose the correct one.`
-                : 'No single reliable order reference found. You can leave it blank and continue.';
-        } catch {
-          analysisNote =
-            'Automatic label reading is unavailable. You can leave the order details blank and continue.';
-        }
-        const referenceId = reference.trim() || detected.referenceId;
+        const referenceId = reference.trim();
         const filedDate =
           source === 'camera'
             ? capture.captureDate
@@ -254,15 +233,16 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
           name: original.name.replace(/\.[^.]+$/, '.jpg'),
           category,
           referenceId,
-          orderName: detected.orderName,
-          detectedReference: detected.referenceId,
-          ocrConfidence: detected.confidence,
+          orderName: '',
+          detectedReference: '',
+          ocrConfidence: 0,
           ...capture,
           filedDate,
           notes,
-          status: 'review',
+          status: demo ? 'review' : 'queued',
           createdAt: Date.now(),
-          analysisNote,
+          analysisNote:
+            'Order-label scanning is paused for faster uploads. Details are optional and can be added later.',
         });
       } catch (e) {
         toast.error((e as Error).message);
@@ -295,27 +275,27 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
             A clear record starts here<span className="heading-dot">.</span>
           </h1>
           <p>
-            We’ll read the order label and original photo date. You’re in
-            control.
+            Add photos quickly. We’ll handle the folder date without delaying
+            the queue.
           </p>
         </div>
         <span className="connection-pill">
           <span className="status-dot" />
-          {online ? 'Ready to scan' : 'Offline · Queuing enabled'}
+          {online ? 'Ready to upload' : 'Offline · Queuing enabled'}
         </span>
       </div>
       {demo && (
         <div className="info-box">
-          <ScanText size={20} />
-          Try order detection with your own photos. Analysis runs on this
-          device; demo photos are not uploaded or saved after leaving this page.
+          <UploadCloud size={20} />
+          Fast-upload mode is active. Order-label scanning is paused; demo
+          photos are not uploaded or saved after leaving this page.
         </div>
       )}
       {!online && (
         <div className="info-box">
           <WifiOff size={18} />
-          Uploads resume on reconnect. If the OCR model has not been cached, you
-          can enter order details manually.
+          Uploads resume on reconnect. Order details are optional and can be
+          entered manually at any time.
         </div>
       )}
       <div className="upload-layout">
@@ -354,7 +334,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
               <span>2</span>
               <div>
                 <h2>Add photos from gallery or camera</h2>
-                <p>Order names and references are detected automatically.</p>
+                <p>Photos are prepared without waiting for order-label OCR.</p>
               </div>
             </div>
             <label className="field-label">
@@ -375,7 +355,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
             <label className="field-label">
               Reference override <small>Optional · applies to this batch</small>
               <input
-                placeholder="Leave blank to read each image’s label"
+                placeholder="Leave blank to add details later"
                 maxLength={120}
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
@@ -405,12 +385,10 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
               }}
             >
               <span className="upload-cloud">
-                <ScanText size={32} />
+                <UploadCloud size={32} />
               </span>
               <h3>
-                {preparing
-                  ? analysisStatus
-                  : 'Drop photos to scan their labels'}
+                {preparing ? analysisStatus : 'Drop photos for fast upload'}
               </h3>
               <p>JPG, PNG, WebP or HEIC · Up to 15 MB each</p>
               <div>
@@ -462,7 +440,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
               <div className="step-heading">
                 <span>3</span>
                 <div>
-                  <h2>Review detected details</h2>
+                  <h2>Review optional details</h2>
                   <p>
                     Upload now, or correct only the details that need attention.
                   </p>
@@ -474,7 +452,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                   <div className="smart-review-fields">
                     <strong>{item.name}</strong>
                     <small>
-                      Label recognition: {item.ocrConfidence || 0}% ·{' '}
+                      Fast upload · order OCR paused ·{' '}
                       {item.captureSource === 'EXIF'
                         ? 'Original photo metadata'
                         : item.captureSource === 'FILENAME'
@@ -493,7 +471,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                       <input
                         maxLength={120}
                         value={item.orderName || ''}
-                        placeholder="Automatically detected when labeled"
+                        placeholder="Optional · add later if needed"
                         onChange={(e) =>
                           void save({ ...item, orderName: e.target.value })
                         }
@@ -504,7 +482,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                       <input
                         maxLength={120}
                         value={item.referenceId}
-                        placeholder="No reliable reference detected"
+                        placeholder="Optional · add later if needed"
                         onChange={(e) =>
                           void save({ ...item, referenceId: e.target.value })
                         }
@@ -579,11 +557,11 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
             </div>
             {!queue.length ? (
               <div className="empty">
-                <ScanText size={35} />
-                <h3>Ready to read the details</h3>
+                <UploadCloud size={35} />
+                <h3>Ready for fast upload</h3>
                 <p>
-                  Add a photo. We’ll suggest the order and find the date it was
-                  taken.
+                  Add a photo. We’ll find its folder date and skip order-label
+                  scanning.
                 </p>
               </div>
             ) : (
@@ -658,7 +636,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
             </code>
             <p>
               <ShieldCheck size={14} />
-              Label reading happens on this device.
+              Order-label scanning is paused for speed.
             </p>
             <small>
               Order details are optional. Any image with a folder date is filed

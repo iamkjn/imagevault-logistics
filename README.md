@@ -2,7 +2,7 @@
 
 A mobile-friendly warehouse photo workspace built with Next.js App Router, TypeScript, Tailwind CSS, shadcn-style Radix primitives, NextAuth, Prisma/PostgreSQL, Google Drive v3, and Recharts.
 
-Capture parcels, pallets, damage, and other items; read order labels automatically; file gallery photos by their original capture date; review unsorted images; manage team access; and monitor uploads.
+Capture parcels, pallets, damage, and other items; file gallery photos by their selected or detected date; review unsorted images; manage team access; and monitor uploads. Order-label OCR is currently paused to keep bulk uploads fast.
 
 ## Fastest prototype hosting: one click, no setup
 
@@ -16,7 +16,7 @@ Use this option when you want to share and test the interface without operationa
 
 That is the entire prototype deployment. Vercel installs and builds the public GitHub repository, supplies HTTPS, and assigns the address. No domain purchase, DNS, Google Cloud project, OAuth consent screen, database, storage configuration, migration, secret, or server maintenance is required.
 
-Prototype mode includes the responsive dashboard, 168 sample records, gallery and folder navigation, image preview, filters, theme, local EXIF/OCR analysis, camera/gallery selection, and simulated management actions. Demo changes reset when the page reloads. Selected images stay in the browser and are not uploaded. Persistent accounts, shared uploads, Google Drive storage, approval workflows, and real exports require the live setup described later.
+Prototype mode includes the responsive dashboard, 168 sample records, gallery and folder navigation, image preview, filters, theme, lightweight date analysis, camera/gallery selection, and simulated management actions. Demo changes reset when the page reloads. Selected images stay in the browser and are not uploaded. Persistent accounts, shared uploads, Google Drive storage, approval workflows, and real exports require the live setup described later.
 
 Every push to `main` triggers a new Vercel deployment after the Git repository is connected. Use Vercel's deployment history to inspect or roll back a release. There is no database to back up in prototype mode.
 
@@ -29,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:3000/demo**. No credentials or database are required for the demo. It contains 168 clearly labeled illustrated samples. Filtering, previews, smart analysis of locally selected photos, folder navigation, theme changes, and sample user/bulk operations are interactive. Demo changes reset on reload. Demo photos are analyzed on the device and are not uploaded or saved. Uploads and exports deliberately require the live workspace.
+Open **http://127.0.0.1:3000/demo**. No credentials or database are required for the demo. It contains 168 clearly labeled illustrated samples. Filtering, previews, local date analysis, folder navigation, theme changes, and sample user/bulk operations are interactive. Demo changes reset on reload. Demo photos stay on the device and are not uploaded or saved. Uploads and exports deliberately require the live workspace.
 
 For real accounts, follow [SETUP.md](docs/SETUP.md). Credentials are not included. The Google OAuth, live Drive, and PostgreSQL flows require deployment-environment integration testing before production use.
 
@@ -209,7 +209,7 @@ These are actual screenshots of the local demo, not screenshots of a connected p
 2. Wait for an administrator to approve your account. Use **Check approval status** to refresh.
 3. Open **Upload**, choose a category, and optionally choose one **Batch folder date** for all gallery images. Leave it blank to detect each image date automatically. Order/reference hints and notes are optional.
 4. Choose one or more images from the gallery, drag images onto the drop zone, or use **Take a photo** on mobile. Camera photos automatically use the current device date. Original files may be JPG, PNG, WebP, HEIC/HEIF and up to 15 MB each.
-5. ImageVault reads EXIF capture metadata before optimization and runs browser-local OCR to suggest the order name and customer reference. The review screen is for quick corrections only; empty order details do not block upload.
+5. ImageVault reads lightweight capture-date metadata before optimization. Order-label OCR is currently paused so images reach the queue faster. The review screen is optional; empty order details do not block upload and can be added later.
 6. Only photos without a selected or detected folder date are filed in **Misc** for an administrator to sort. ImageVault converts accepted images to JPEG, scales them to at most 1920 pixels, removes original metadata, and compresses to under 3 MB for transport. Unsupported HEIC variants show an error; export those to JPEG on your device.
 7. Watch per-image upload progress. Failed items have a **Retry** button. Each queue item retains its idempotency ID.
 8. Open **My uploads** to browse your history and filter by reference, category, upload date, folder date, or folder status. Preview metadata and download images you uploaded.
