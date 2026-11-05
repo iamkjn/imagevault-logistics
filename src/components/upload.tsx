@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import imageCompression from 'browser-image-compression';
 import {
   UploadCloud,
   Camera,
@@ -32,7 +31,8 @@ import {
   deleteQueue,
   type QueuedImage,
 } from '@/lib/queue';
-import { readCapture } from '@/lib/photo-analysis';
+import { cameraCapture } from '@/lib/photo-intelligence';
+import { getDriveAccessToken, uploadDirectToDrive } from '@/lib/direct-drive';
 import type { Viewer } from '@/lib/client';
 const cats = [
   { name: 'Parcels', icon: Package, description: 'Packages & deliveries' },
@@ -69,6 +69,7 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
     [drag, setDrag] = useState(false),
     [editingId, setEditingId] = useState<string | null>(null),
     [reviewPage, setReviewPage] = useState(1),
+    [driveUploading, setDriveUploading] = useState(false),
     [progress, setProgress] = useState<Record<string, number>>({}),
     [completed, setCompleted] = useState(0);
   const picker = useRef<HTMLInputElement>(null),
@@ -206,34 +207,16 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
           throw new Error(`${original.name}: maximum original size is 15 MB.`);
         if (!/\.(jpe?g|png|webp|heic|heif)$/i.test(original.name))
           throw new Error(`${original.name}: choose JPG, PNG, WebP or HEIC.`);
-        setAnalysisStatus(`Reading original capture date · ${original.name}`);
-        const capture = await readCapture(original, source); // Must happen before conversion/compression removes EXIF.
-        let file = original;
-        if (/\.hei[cf]$/i.test(original.name)) {
-          const { default: heic2any } = await import('heic2any');
-          const converted = await heic2any({
-            blob: original,
-            toType: 'image/jpeg',
-            quality: 0.8,
-          });
-          file = new File(
-            [Array.isArray(converted) ? converted[0] : converted],
-            original.name.replace(/\.hei[cf]$/i, '.jpg'),
-            { type: 'image/jpeg' },
-          );
-        }
-        const compressed = await imageCompression(file, {
-          maxSizeMB: 2.9,
-          maxWidthOrHeight: 1920,
-          initialQuality: 0.8,
-          fileType: 'image/jpeg',
-          useWebWorker: false,
-          preserveExif: false,
-        });
-        if (compressed.size > 3 * 1024 * 1024)
-          throw new Error(
-            'The image could not be compressed enough. Choose a smaller file.',
-          );
+        setAnalysisStatus(`Adding · ${original.name}`);
+        const capture =
+          source === 'camera'
+            ? cameraCapture()
+            : {
+                captureDate: null,
+                capturedAtLocal: null,
+                captureOffset: null,
+                captureSource: 'UNKNOWN' as const,
+              };
         const referenceId = reference.trim();
         const filedDate =
           source === 'camera'
@@ -242,8 +225,8 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
         await save({
           id: crypto.randomUUID(),
           userId: user.id,
-          file: compressed,
-          name: original.name.replace(/\.[^.]+$/, '.jpg'),
+          file: original,
+          name: original.name,
           category,
           referenceId,
           orderName: '',
@@ -280,9 +263,24 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
   }, [reviewPage, reviewPageCount]);
   const approve = async () => {
     if (demo) {
-      toast.info(
-        'Analysis stays on this device in the demo. Sign in to upload to Drive.',
-      );
+      setDriveUploading(true);
+      try {
+        const token = await getDriveAccessToken();
+        let uploaded = 0;
+        for (const item of reviews) {
+          await uploadDirectToDrive(token, item);
+          await remove(item.id);
+          uploaded += 1;
+          setCompleted((count) => count + 1);
+        }
+        toast.success(
+          `${uploaded} image${uploaded === 1 ? '' : 's'} uploaded to your Logistics folder.`,
+        );
+      } catch (error) {
+        toast.error((error as Error).message);
+      } finally {
+        setDriveUploading(false);
+      }
       return;
     }
     for (const item of reviews)
@@ -313,8 +311,8 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
       {demo && (
         <div className="info-box">
           <UploadCloud size={20} />
-          Fast-upload mode is active. Order-label scanning is paused; demo
-          photos are not uploaded or saved after leaving this page.
+          Fast-upload mode is active. Order-label scanning is paused; your
+          photos upload directly to the connected Logistics folder.
         </div>
       )}
       {!online && (
@@ -331,7 +329,9 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
               <span>1</span>
               <div>
                 <h2>Choose a category</h2>
-                <p>We’ll organize each photo by its original capture date.</p>
+                <p>
+                  Choose one folder date for the batch, or leave it in Misc.
+                </p>
               </div>
             </div>
             <div className="category-options">
@@ -374,8 +374,8 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
               />
               <small>
                 Pick once to file every selected gallery image under this date.
-                Leave blank to detect each image automatically. Camera photos
-                always use today.
+                Leave blank to put the batch in Misc for later sorting. Camera
+                photos always use today.
               </small>
             </label>
             <label className="field-label">
@@ -434,8 +434,8 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                 </Button>
               </div>
               <small>
-                Original capture dates are read before optimization. GPS and
-                other metadata are removed.
+                Files are added immediately as-is. OCR, metadata scanning,
+                conversion and compression are paused.
               </small>
             </div>
             <input
@@ -534,10 +534,12 @@ export function UploadPage({ user, demo }: { user: Viewer; demo: boolean }) {
                   </Button>
                 </div>
               )}
-              <Button disabled={preparing} onClick={approve}>
+              <Button disabled={preparing || driveUploading} onClick={approve}>
                 <UploadCloud size={16} />
                 {demo
-                  ? 'Connect workspace to upload'
+                  ? driveUploading
+                    ? 'Uploading to Drive…'
+                    : `Upload ${reviews.length} to Logistics Drive`
                   : `Upload ${reviews.length} reviewed photo${reviews.length === 1 ? '' : 's'}`}
               </Button>
               <Dialog
